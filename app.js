@@ -1,45 +1,60 @@
-$('.view').fa({
+var conf = {
+	
 	viewPathUrl: '/views/',
 	//If set true, then can be used button back, in browser, but in url will be changes
-	enableHashUrl: false,
+	enableHashUrl: true,
 	controllers: {
 
 		MainController:{
 
 			actionIndex:{
 				view: 'main',
-				execute: function($state, $scope){
-
-					return [$state, $scope];
+				execute: function($state, $object){
+					return [$state, $object];
 				}
 			}
 
 		},
 
-		BlogController: {
+		ExampleController: {
 
 			actionIndex:{
-				view: 'blog',
-				execute: function($state, $scope){
-					return [$state, $scope];
+				view: 'all-exmaple',
+				execute: function($state, $object){
+					return [$state, $object];
 				}
 			},
 
-			actionNews:{
-				view: 'news',
-				execute: function($state, $scope){
-
-					$scope.res = ~~$scope.num1 + ~~$scope.num2;
-					
-					return [$state, $scope];
+			actionFaobject:{
+				view: 'fa-object-example',
+				execute: function($state, $object){
+					return [$state, $object];
 				}
 			},
 
-			actionPage:{
-				view: 'page',
-				execute: function($state, $scope){
+			actionFaclick:{
+				view: 'fa-click-example',
+				execute: function($state, $object){
 
-					return [$state, $scope];
+					if (!$object.display)
+						$object.display = 'block';
+
+					$object.toggle = function(){
+						$object.display = $object.display == 'block'  ? 'none' : 'block' ;  
+					}
+
+					return [$state, $object];
+
+				}
+			},
+			
+			actionFaif:{
+				view: 'fa-if-example',
+				execute: function($state, $object){
+
+					$object.array = ['first', 'second', 'third', 'fouth'];
+
+					return [$state, $object];
 				}
 			}
 
@@ -50,4 +65,7 @@ $('.view').fa({
 	debug: function(app){
 		// console.log(app);
 	}
-});
+
+};
+
+$('.view').fa(conf);
