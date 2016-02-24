@@ -1,4 +1,7 @@
 $.fn.fa = function(conf) {
+
+    if (!conf)
+        conf = {};
     
     var FaObject = new Fa(conf, this);
 
@@ -19,6 +22,12 @@ $.fn.fa = function(conf) {
         this.localReady;
 
         this.pregMask = {};
+
+        this.ifMasks = {};
+
+        this.globalConter = 0;
+
+        this.globalIfCounter = 0;
 
         this.listenHash = function(listenHash) {
 
@@ -49,6 +58,7 @@ $.fn.fa = function(conf) {
                 });
 
             }else{
+
                 $(document).on('click', this.viewSelector+' > [fa-link]', function(event) {
 
                     event.preventDefault();
@@ -56,6 +66,7 @@ $.fn.fa = function(conf) {
                     self.route($(this).attr('href'));
 
                 });
+                
             }
 
             
@@ -63,6 +74,9 @@ $.fn.fa = function(conf) {
 
         this.getCurrentAction = function(listenHash, href){
 
+            if (href)
+                var href = href.replace("/", "");
+            
             if ( self.ready && !listenHash && localStorage.getItem('currentAction') ) {
 
                 var routeData = JSON.parse(localStorage.getItem('currentAction'));
@@ -80,6 +94,7 @@ $.fn.fa = function(conf) {
                     routeData = {};
 
                 if ($.isEmptyObject(urlData)) {
+
                     routeData = {
 
                         controller: 'MainController',
@@ -87,8 +102,11 @@ $.fn.fa = function(conf) {
                         action: 'actionIndex',
 
                         url: h
+
                     }
+    
                 } else {
+
                     routeData = {
 
                         controller: this.helpers.ucfirst(urlData[0]) + 'Controller',
@@ -96,62 +114,141 @@ $.fn.fa = function(conf) {
                         action: urlData[1] ? 'action' + this.helpers.ucfirst(urlData[1]) : 'actionIndex',
 
                         url: h
+
                     }
+
                 } 
 
             }
-
 
             if (!listenHash) 
                 localStorage.setItem('currentAction', JSON.stringify(routeData));
 
             return routeData;
+
         }
 
         this.renderView = function(templateName){
 
             var result = false;
 
-            if (templateName) {
+            if ( templateName != 'application' ){
 
-                $.ajax({
+                if (templateName) {
 
-                    url: conf.viewPathUrl + templateName + '.html',
+                    $.ajax({
 
-                    type: 'GET',
+                        url: conf.viewPathUrl + templateName + '.html',
 
-                    dataType: 'html',
+                        type: 'GET',
 
-                    async: false,
+                        dataType: 'html',
 
-                    success: function(res) {
+                        async: false,
 
-                        if (res) {
+                        success: function(res) {
 
-                            viewElementJQueryObject.html(res);
+                            if (res) {
 
-                            result = true; 
+                                viewElementJQueryObject.html(res);
+
+                                result = true; 
+
+                            }
+
+                        },
+
+                        error: function(){
+
+                            console.warn('Template - '+ templateName + '.html is not load');
 
                         }
 
-                    },
+                    });
 
-                    error: function(){
+                }
 
-                        console.log('Template - '+ templateName + '.html is not load');
-
-                    }
-
-                });
-
-            }
+            }else
+                result = true;
+            
 
             return result;
         }
 
+        this.ifListener = function(localScope){
+
+            $(document).find(this.viewSelector+' > [fa-if]').each(function(index, el) {
+                
+                var ifExpression = $(this).attr('fa-if');
+
+                if (ifExpression) {
+
+                    var tempExpression = ifExpression;
+
+                    $.each(localScope, function(indexScope, valScope) {
+
+                        if ( ifExpression.indexOf(indexScope)  >= 0 ){
+
+                            if (valScope){
+
+                                if (isNaN(parseInt(valScope)))
+                                    valScope = '"'+valScope+'"';
+
+                            }else
+                                valScope = 0;
+
+                            tempExpression = tempExpression.replace(new RegExp(indexScope.trim(),'g'), valScope );
+
+                        }
+
+                    });
+
+                    if (!new Function('return ('+tempExpression.trim()+')')()){
+
+                        var attrIndex = $(this).attr('fa-if-index');
+
+                        if (!attrIndex){
+
+                            $(this).attr('fa-if-index', self.globalIfCounter);
+
+                            if ($(this).html())
+                                self.ifMasks[self.globalIfCounter] = $(this).html();
+
+                        }
+                        
+                        $(this).addClass('fa-disabled').html("").css('display', 'none');
+
+                        self.globalIfCounter++;
+
+                    }else{
+
+                        if ($(this).hasClass('fa-disabled')) {
+
+                            var html = self.ifMasks[$(this).attr('fa-if-index')];
+
+                            if (html)
+                                $(this).html(html).removeClass('fa-disabled');
+
+                            $(this).css('display', 'block');
+
+                        }
+
+                    }
+
+
+                }
+
+            });
+
+            self.updateAttrAndTextModels(localScope, true)
+
+        }
+
         this.modelListener = function(globalScope, actionFunction, globalState){
 
-            $(document).off('change keyup', this.viewSelector+' > [fa-model]');
+            this.pregMask = {};
+
+            $(document).off('change keyup', this.viewSelector+' > [fa-object]');
 
             $(document).off('click', this.viewSelector+' > [fa-click]');
 
@@ -161,13 +258,13 @@ $.fn.fa = function(conf) {
 
             var localState = globalState;
 
-            var $modelsJQueryObjects = $(document).find(this.viewSelector).find('[fa-model]');
+            var $modelsJQueryObjects = $(document).find(this.viewSelector).find('[fa-object]');
 
             if (this.localReady && $modelsJQueryObjects.length) {
 
                 $.each($modelsJQueryObjects, function(index, val) {
 
-                    localScope[$(this).attr('fa-model')] = $(this).is('input') ? $(this).val() : $(this).text();
+                    localScope[$(this).attr('fa-object')] = $(this).is('input') ? $(this).val() : $(this).text();
 
                 });
 
@@ -186,10 +283,10 @@ $.fn.fa = function(conf) {
             if (this.localReady)
                 localScope = this.updateInModelScope($modelsJQueryObjects, updateScope, localScope);
 
-            $(document).on('change keyup', this.viewSelector+' > [fa-model]', function(event) {
+            $(document).on('change keyup', this.viewSelector+' > [fa-object]', function(event) {
                 event.preventDefault();
                 
-                localScope[$(this).attr('fa-model')] = $(this).val();
+                localScope[$(this).attr('fa-object')] = $(this).val();
 
                 var resultAction = actionFunction(localState, localScope);
 
@@ -199,11 +296,17 @@ $.fn.fa = function(conf) {
 
                 self.updateModel($modelsJQueryObjects, localScope);
 
+                self.ifListener(localScope);
+
                 self.updateAttrAndTextModels(localScope);
+
+                self.stateListener(localState);
+
 
             });
 
             $(document).on('click', this.viewSelector+' > [fa-click]', function(event) {
+
                 event.preventDefault();
                 
                 var executeFunction = $(this).attr('fa-click').replace('()', "");
@@ -220,7 +323,12 @@ $.fn.fa = function(conf) {
 
                     self.updateModel($modelsJQueryObjects, localScope);
 
+                    self.ifListener(localScope);
+
                     self.updateAttrAndTextModels(localScope);
+
+                    self.stateListener(localState);
+
 
                 }else{
                     console.warn('Function - "'+ executeFunction +'()" is not defined');
@@ -228,19 +336,49 @@ $.fn.fa = function(conf) {
                 
             });
 
-            if (!this.localReady) 
+            
+
+            if (!this.localReady) {
+
                 this.updateAttrAndTextModels(localScope, true);
-            
-                      
-            
+
+                this.ifListener(localScope);
+
+            }
 
             if (this.localReady)
                 return [localScope, localState];
         }
 
-        this.updateAttrAndTextModels = function(localScope, status){
+        this.stateListener = function(state){
 
-            var counter = 0;
+            if (state.redirect) {
+
+                if (conf.enableHashUrl) {
+
+                    window.history.pushState(state.redirect, '', state.redirect);
+
+                    this.route(state.redirect); 
+
+                }else{
+
+                    var currentAction = localStorage.getItem('currentAction');
+
+                    currentAction = JSON.parse(currentAction);
+
+                    if (currentAction.url != state.redirect) {
+
+                        this.route(state.redirect); 
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        this.updateAttrAndTextModels = function(localScope, status){
 
             if (status) {
 
@@ -252,11 +390,11 @@ $.fn.fa = function(conf) {
 
                             if (this.value.indexOf("{{")  >= 0) {
 
-                                $(val).addClass('fa-preg'+counter);
+                                $(val).addClass('fa-preg'+self.globalConter);
 
                                 var tmpText = this.value;
 
-                                self.pregMask['fa-preg'+counter] = {
+                                self.pregMask['fa-preg'+self.globalConter] = {
 
                                     text: tmpText,
 
@@ -268,7 +406,7 @@ $.fn.fa = function(conf) {
 
                                 $(val).attr(this.name, str);
 
-                                counter++;
+                                self.globalConter++;
                             }
 
                         }
@@ -277,9 +415,9 @@ $.fn.fa = function(conf) {
 
                     if ($(this).text().indexOf("{{") >= 0) {
 
-                        $(this).addClass('fa-preg'+counter);
+                        $(this).addClass('fa-preg'+self.globalConter);
 
-                        self.pregMask['fa-preg'+counter] = {
+                        self.pregMask['fa-preg'+self.globalConter] = {
 
                             text: $(this).text(),
 
@@ -289,7 +427,7 @@ $.fn.fa = function(conf) {
 
                         $(val).text(str);
 
-                        counter++;
+                        self.globalConter++;
 
                     }
 
@@ -303,10 +441,23 @@ $.fn.fa = function(conf) {
 
                         var str = self.attrReplace(val.text, localScope);
 
-                        console.log($('.'+index));
+                        if (val.attr) {
 
-                        val.attr ? $('.'+index).attr(val.attr, str) : $('.'+index).text(str);
+                            if (val.attr == 'value') {
 
+                                $('.'+index).val(str);
+
+                            }else{
+
+                                $('.'+index).attr(val.attr, str);
+
+                            }
+
+                        }else{
+
+                            $('.'+index).text(str);
+                            
+                        }
                     });
 
                 };
@@ -327,9 +478,40 @@ $.fn.fa = function(conf) {
 
                     var r = self.helpers.explode('}}', val);
 
-                    secondPart = localScope[r[0]] ? localScope[r[0]] : '';
+                    if (val.indexOf("+") >= 0 || val.indexOf("-") >= 0 || val.indexOf("/") >= 0 || val.indexOf("*") >= 0) {
+
+                        var mathTmpStr = r[0];
+
+                        for (var index = 0; index < Object.keys(localScope).length; ++index) {
+
+                            var key = Object.keys(localScope)[index],
+
+                                value = localScope[Object.keys(localScope)[index]];
+
+                            if (!value || isNaN(value)) 
+                                value = 0;
+                            
+                            value = parseInt(value);
+
+         
+                            if (mathTmpStr.indexOf(key.trim()) >= 0) {
+
+                                mathTmpStr = mathTmpStr.replace(new RegExp(key.trim(),'g'), value);
+
+                            }
+                            
+                        }
+                        if (mathTmpStr) 
+                            secondPart = new Function('return '+mathTmpStr)();
+
+                    }else{
+
+                        secondPart = localScope[r[0]] ? localScope[r[0]] : '';
+                    }
 
                     str += secondPart + r[1];
+
+                    secondPart = "";
 
                  }else{
 
@@ -337,6 +519,8 @@ $.fn.fa = function(conf) {
 
                  }
             });
+
+
             return str;
         }
 
@@ -346,7 +530,7 @@ $.fn.fa = function(conf) {
 
                 $.each(updateScope, function(indexScope, valScope) {
 
-                     if ($(valElemen).attr('fa-model') == indexScope && $(valElemen).val() != valScope) {
+                     if ($(valElemen).attr('fa-object') == indexScope && $(valElemen).val() != valScope) {
 
                         $(valElemen).is('input') ? $(valElemen).val(valScope) : $(valElemen).text(valScope);
 
@@ -366,7 +550,7 @@ $.fn.fa = function(conf) {
 
                 $.each(updateScope, function(indexScope, valScope) {
 
-                     if ($(valElemen).attr('fa-model') == indexScope) {
+                     if ($(valElemen).attr('fa-object') == indexScope) {
 
                         localScope[indexScope] = valScope;
 
@@ -383,6 +567,9 @@ $.fn.fa = function(conf) {
 
         this.route = function(href){
 
+            if (localStorage.getItem('currentAction') && conf.enableHashUrl) 
+                localStorage.setItem('currentAction', false);
+
             this.localReady = true;
 
             var globalScope = {};
@@ -394,6 +581,28 @@ $.fn.fa = function(conf) {
             this.listenHash(conf.enableHashUrl);
 
             this.currentActions = this.getCurrentAction(conf.enableHashUrl, href);
+
+            if ( $.isEmptyObject( conf.controllers ) ){
+
+                conf.controllers = {
+
+                    MainController:{
+
+                        actionIndex:{
+                            view: 'application',
+                            execute: function($state, $object){
+
+                                return [$state, $object];
+
+                            }
+
+                        }
+
+                    },
+
+                }
+
+            }
 
             if (conf.controllers[this.currentActions.controller]) {   
 
@@ -415,9 +624,10 @@ $.fn.fa = function(conf) {
 
                         if (conf.debug) 
                             conf.debug(this);
-                        
 
                         this.ready = false;
+
+                        self.stateListener(executeResult[0]);
 
                     }else{
                         console.warn('Select template in your action');
@@ -474,10 +684,97 @@ $.fn.fa = function(conf) {
                 var f = str.charAt(0).toUpperCase();
 
                 return f + str.substr(1, str.length-1);
-                
+
+            },
+
+            isExpressionValue: function(tempExpression){
+
+                if (tempExpression.indexOf("<")  >= 0 || 
+
+                    tempExpression.indexOf(">")  >= 0 ||
+
+                    tempExpression.indexOf(">=")  >= 0 ||
+
+                    tempExpression.indexOf("=>")  >= 0 ||
+
+                    tempExpression.indexOf("===")  >= 0 ||
+
+                    tempExpression.indexOf("==")  >= 0 ||
+
+                    tempExpression.indexOf("&&")  >= 0 ||
+
+                    tempExpression.indexOf("||")  >= 0 
+                    )
+                    return true;
+                else
+                    return false;
+            },
+
+            isInt: function(n){
+                return Number(n) === n && n % 1 === 0;
+            },
+
+            replace: function(search, replace, subject){
+
+                if(!(replace instanceof Array)){
+
+                    replace=new Array(replace);
+
+                    if(search instanceof Array){
+
+                        while(search.length>replace.length){
+
+                            replace[replace.length]=replace[0];
+
+                        }
+
+                    }
+
+                }
+
+                if(!(search instanceof Array))search=new Array(search);
+
+                while(search.length>replace.length){
+
+                    replace[replace.length]='';
+
+                }
+
+                if(subject instanceof Array){
+
+                    for(k in subject){
+
+                        subject[k]=str_replace(search,replace,subject[k]);
+
+                    }
+
+                    return subject;
+
+                }
+
+                for(var k=0; k<search.length; k++){
+
+                    var i = subject.indexOf(search[k]);
+
+                    while(i>-1){
+
+                        subject = subject.replace(search[k], replace[k]);
+
+                        i = subject.indexOf(search[k],i);
+
+                    }
+
+                }
+
+                return subject;
+    
             }
         }
 
     }
 
 };
+
+function log(str){
+    console.log(str);
+}
